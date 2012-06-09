@@ -1,3 +1,5 @@
+#define IO_DEBUG
+
 #if HAVE_CONFIG_H
   #include <config.h>
 #endif
@@ -247,7 +249,90 @@ writeData( int fd, unsigned char *buf, int nChars )
   return TRUE;
 }
 
-int
+
+inline unsigned short SwapEndian(unsigned short val)
+{
+    return (val<<8) | (val>>8);
+}
+
+inline unsigned long SwapEndian(unsigned long val)
+{
+    return (val<<24) | ((val<<8) & 0x00ff0000) |
+            ((val>>8) & 0x0000ff00) | (val>>24);
+}
+
+void 
+printMotSystemReport(unsigned char *buf, int len){
+#pragma pack(push)
+#pragma pack(1)
+  typedef struct{
+    unsigned short pkt_stx; // 2
+    char port;   //1
+    char packet_id; //1
+    char opcode; //1
+    char data_length; //1
+
+    unsigned long rv; //4
+    unsigned long timestamp; //4
+    char axis; //1
+    unsigned long position;//4
+    unsigned long velocity;//4
+    unsigned long accel;//4
+    unsigned long torque;//4
+
+    char checksum;//1
+    unsigned short pkt_etx;//2
+  } Report ;
+
+  //typedef struct{
+    //unsigned short pkt_stx; // 2
+    //char port;   //1
+    //char packet_id; //1
+    //char opcode; //1
+    //char data_length; //1
+
+    //unsigned long rv; //4
+    //unsigned long timestamp; //4
+    //char axis; //1
+    //char dummy; //1
+    //unsigned long position;//4
+    //unsigned long velocity;//4
+    //unsigned long accel;//4
+    //unsigned long torque;//4
+
+    //char checksum;//1
+    //unsigned short pkt_etx;//2
+  //} Report1 ;//only one extra byte added after axis
+
+#pragma pack(pop)
+
+  FILE * fout;
+  FILE * out;
+
+  if ((fout = fopen("rflex.log","a"))!=0)
+    out=fout;
+  else
+    out=stderr;
+
+  if (len!=sizeof(Report)){
+    fprintf(out, "size of motion message is incorrect!\n");
+  }
+
+  for (int i=0;i<len;i++)
+    fprintf( out, ".%s%x", buf[i]<16?"0":"", buf[i] );
+  
+  Report * rep = (Report*) buf;
+
+  fprintf( out, "  time:%lu axis:%hhu pos:%d vel:%d\n", 
+      SwapEndian(rep->timestamp), rep->axis, 
+      (int)SwapEndian(rep->position), 
+      (int)SwapEndian(rep->velocity));
+
+  fclose(fout);
+  return;
+}
+
+  int
 waitForETX( int fd, unsigned char *buf, int  *len )
 {
   static int pos, loop, val, dlen;
@@ -261,61 +346,61 @@ waitForETX( int fd, unsigned char *buf, int  *len )
       read( fd, &(buf[pos]), 1 );
       pos++;
       if (pos>5) {
-	dlen = buf[5] + 9; /* std length (9 char) + data length - end chars (2)*/
+        dlen = buf[5] + 9; /* std length (9 char) + data length - end chars (2)*/
       }
       if (dlen>0 && pos>=dlen) {
-	  if (buf[dlen-2]==B_ESC && buf[dlen-1]==B_ETX) {
-	      *len = dlen;
+        if (buf[dlen-2]==B_ESC && buf[dlen-1]==B_ETX) {
+          *len = dlen;
 #ifdef IO_DEBUG
-	      fprintf( stderr, "- answer ->" );
-	      for (i=0;i<pos;i++)
-		  fprintf( stderr, "[0x%s%x]", buf[i]<16?"0":"", buf[i] );
-	      fprintf( stderr, "\n" );
+          if (buf[2]==2){
+            //fprintf( stderr, "-       answer ->" );
+            printMotSystemReport(buf, pos);
+          }
 #else
 #ifdef DEBUG
-	      fprintf( stderr, "(%d)", *len );
+          fprintf( stderr, "(%d)", *len );
 #endif
 #endif
-	      return(TRUE);
+          return(TRUE);
 
-	  }
-	  else if(buf[2] == 0x06 && pos == dlen)
-	    {
-	      //Wait to have one more byte
-	    }
-	  else if(buf[2] == 0x06 && pos >= (dlen+1) && buf[dlen-1]==B_ESC && buf[dlen-0]==B_ETX)
-	    {
-	      //haunted packet. We have a ghost byte at the 7th position. scrap it and send a corrected paquet
-	      for (int j = 0;j<(buf[5]+3);j++)
-		{
-		  //shift byte to the left
-		  buf[j+6] = buf[j+7];
-		}
+        }
+        else if(buf[2] == 0x06 && pos == dlen)
+        {
+          //Wait to have one more byte
+        }
+        else if(buf[2] == 0x06 && pos >= (dlen+1) && buf[dlen-1]==B_ESC && buf[dlen-0]==B_ETX)
+        {
+          //haunted packet. We have a ghost byte at the 7th position. scrap it and send a corrected paquet
+          for (int j = 0;j<(buf[5]+3);j++)
+          {
+            //shift byte to the left
+            buf[j+6] = buf[j+7];
+          }
 
-	      *len = dlen;
+          *len = dlen;
 
 #ifdef IO_DEBUG
-              fprintf( stderr, "- fixed answer ->" );
-              for (i=0;i<pos;i++)
-		fprintf( stderr, "[0x%s%x]", buf[i]<16?"0":"", buf[i] );
-              fprintf( stderr, "\n" );
+          if (buf[2]==2){
+            //fprintf( stderr, "- fixed answer ->" );
+            printMotSystemReport(buf, pos);
+          }
 #endif
 
 
-	      return(TRUE);
-	  } else {
+          return(TRUE);
+        } else {
 #ifdef IO_DEBUG
-	      fprintf( stderr, "- wrong answer ->" );
-	      for (i=0;i<pos;i++)
-		  fprintf( stderr, "[0x%s%x]", buf[i]<16?"0":"", buf[i] );
-	      fprintf( stderr, "\n" );
+          if (buf[2]==2){
+            //fprintf( stderr, "- wrong answer ->" );
+            printMotSystemReport(buf, pos);
+          }
 #else
 #ifdef DEBUG
-	      fprintf( stderr, "-" );
+          fprintf( stderr, "-" );
 #endif
 #endif
-	      return(FALSE);
-	  }
+          return(FALSE);
+        }
       }
 
     } else {
@@ -324,7 +409,7 @@ waitForETX( int fd, unsigned char *buf, int  *len )
     }
   }
 #ifdef IO_DEBUG
-  fprintf( stderr, "\n" );
+  //fprintf( stderr, "\n" );
 #endif
   return(FALSE);
 }

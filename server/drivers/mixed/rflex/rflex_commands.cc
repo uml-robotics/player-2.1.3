@@ -376,9 +376,11 @@ static void parseMotReport( unsigned char *buffer )
     if (axis == 0) {
       status.distance = convertBytes2UInt32(&(buffer[15]));
       status.t_vel = convertBytes2UInt32(&(buffer[19]));
+      //fprintf(stderr, "t_vel: %d\n", status.t_vel);
     } else if (axis == 1) {
       status.bearing = convertBytes2UInt32(&(buffer[15]));
       status.r_vel = convertBytes2UInt32(&(buffer[19]));
+      //fprintf(stderr, "rot_vel: %d\n", status.r_vel);
     }
     acc       = convertBytes2UInt32(&(buffer[23]));
     trq       = convertBytes2UInt32(&(buffer[27]));
