@@ -283,26 +283,6 @@ inline unsigned long SwapEndian(unsigned long val)
     unsigned short pkt_etx;//2
   } Report ;
 
-  //typedef struct{
-    //unsigned short pkt_stx; // 2
-    //char port;   //1
-    //char packet_id; //1
-    //char opcode; //1
-    //char data_length; //1
-
-    //unsigned long rv; //4
-    //unsigned long timestamp; //4
-    //char axis; //1
-    //char dummy; //1
-    //unsigned long position;//4
-    //unsigned long velocity;//4
-    //unsigned long accel;//4
-    //unsigned long torque;//4
-
-    //char checksum;//1
-    //unsigned short pkt_etx;//2
-  //} Report1 ;//only one extra byte added after axis
-
 #pragma pack(pop)
 void
 
