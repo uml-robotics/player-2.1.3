@@ -249,6 +249,7 @@ writeData( int fd, unsigned char *buf, int nChars )
   return TRUE;
 }
 
+namespace debug{
 
 inline unsigned short SwapEndian(unsigned short val)
 {
@@ -261,8 +262,6 @@ inline unsigned long SwapEndian(unsigned long val)
             ((val>>8) & 0x0000ff00) | (val>>24);
 }
 
-void 
-printMotSystemReport(unsigned char *buf, int len){
 #pragma pack(push)
 #pragma pack(1)
   typedef struct{
@@ -305,14 +304,13 @@ printMotSystemReport(unsigned char *buf, int len){
   //} Report1 ;//only one extra byte added after axis
 
 #pragma pack(pop)
+void
 
-  FILE * fout;
-  FILE * out;
+printMotSystemReport(unsigned char *buf, int len){
+  if (buf[4]!=33) // other possibility is 7 (probably velocity confirmation packet)
+    return;
 
-  if ((fout = fopen("rflex.log","a"))!=0)
-    out=fout;
-  else
-    out=stderr;
+  FILE *out = stdout;
 
   if (len!=sizeof(Report)){
     fprintf(out, "size of motion message is incorrect!\n");
@@ -323,14 +321,14 @@ printMotSystemReport(unsigned char *buf, int len){
   
   Report * rep = (Report*) buf;
 
-  fprintf( out, "  time:%lu axis:%hhu pos:%d vel:%d\n", 
-      SwapEndian(rep->timestamp), rep->axis, 
+  fprintf( out, "  time:%.3f axis:%hhu pos:%d vel:%d\n",
+      SwapEndian(rep->timestamp) / 250.0, rep->axis,
       (int)SwapEndian(rep->position), 
       (int)SwapEndian(rep->velocity));
 
-  fclose(fout);
   return;
 }
+}// namespace debug
 
   int
 waitForETX( int fd, unsigned char *buf, int  *len )
@@ -354,7 +352,7 @@ waitForETX( int fd, unsigned char *buf, int  *len )
 #ifdef IO_DEBUG
           if (buf[2]==2){
             //fprintf( stderr, "-       answer ->" );
-            printMotSystemReport(buf, pos);
+            debug::printMotSystemReport(buf, pos);
           }
 #else
 #ifdef DEBUG
@@ -382,7 +380,7 @@ waitForETX( int fd, unsigned char *buf, int  *len )
 #ifdef IO_DEBUG
           if (buf[2]==2){
             //fprintf( stderr, "- fixed answer ->" );
-            printMotSystemReport(buf, pos);
+            debug::printMotSystemReport(buf, pos);
           }
 #endif
 
@@ -392,7 +390,7 @@ waitForETX( int fd, unsigned char *buf, int  *len )
 #ifdef IO_DEBUG
           if (buf[2]==2){
             //fprintf( stderr, "- wrong answer ->" );
-            printMotSystemReport(buf, pos);
+            debug::printMotSystemReport(buf, pos);
           }
 #else
 #ifdef DEBUG
